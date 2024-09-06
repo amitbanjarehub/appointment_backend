@@ -1,37 +1,43 @@
-const appointmentRoutes = require("./routes/appointmentRoutes");
-
-
-// server.js
+// app.js or index.js
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
-
-require("dotenv").config(); // Load environment variables from .env file
+const connectToMongoDB = require("./connection/db/mongoConnection");
+const appointmentRoutes = require("./routes/appointmentRoutes");
+require("dotenv").config();
 
 const app = express();
 
-// Middleware
-app.use(cors()); // Enable CORS for all routes
-app.use(express.json()); // Parse incoming JSON requests
+app.use(cors());
+app.use(express.json());
 
-// Connect to MongoDB
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.log("Error connecting to MongoDB:", err));
+async function startServer() {
+  const db = await connectToMongoDB(); // Connect to MongoDB and get the db instance
 
-// Basic route
-app.get("/", (req, res) => {
-  res.send("Backend is connected to the MongoDB database!");
-});
+  if (!db) {
+    console.error("Failed to connect to MongoDB");
+    process.exit(1);
+  } else {
+    console.log("MongoDB connection established successfully");
+  }
 
-app.use("/api", appointmentRoutes);
+  app.get("/", (req, res) => {
+    res.send("Backend is connected to the MongoDB database!");
+  });
 
+  // Attach the db to req object and pass it to routes
+  app.use(
+    "/api",
+    (req, res, next) => {
+      req.db = db;
+      next();
+    },
+    appointmentRoutes
+  ); // You can use routes as middleware
 
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
 
-
-// Listen on the specified port
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+startServer(); // Start the server after MongoDB is connected
